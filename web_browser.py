@@ -17,20 +17,18 @@ AD_BLOCK_LIST = [
     "tracking", "analytics"
 ]
 
-
-# ---------------- AD BLOCKER ----------------
+# ------------- Ad Blocker ---------------------
 class AdBlocker(QWebEngineUrlRequestInterceptor):
     def interceptRequest(self, info):
         url = info.requestUrl().toString().lower()
         if any(ad in url for ad in AD_BLOCK_LIST):
             info.block(True)
 
-
-# ---------------- BROWSER ----------------
+# ------------- Web Browser ---------------------
 class Browser(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Python Web Browser")
+        self.setWindowTitle("Google Web Browser")
         self.setGeometry(100, 100, 1200, 800)
 
         self.bookmarks = self.load_json(BOOKMARKS_FILE)
@@ -47,7 +45,7 @@ class Browser(QMainWindow):
         self.build_toolbar()
         self.add_new_tab(QUrl(HOME_URL))
 
-    # ---------------- UI ----------------
+    # ------------- User Interface ---------------------
     def build_toolbar(self):
         nav = QToolBar()
         self.addToolBar(nav)
@@ -67,7 +65,7 @@ class Browser(QMainWindow):
         nav.addAction("🕶️", self.new_incognito_tab)
         nav.addAction("🧠", self.summarize_page)
 
-    # ---------------- TABS ----------------
+  # ------------- Tabs ---------------------
     def add_new_tab(self, url, incognito=False):
         profile = QWebEngineProfile() if incognito else self.profile
         page = QWebEnginePage(profile, self)
@@ -93,7 +91,7 @@ class Browser(QMainWindow):
     def current(self):
         return self.tabs.currentWidget()
 
-    # ---------------- NAVIGATION ----------------
+  # ------------- Navigation ---------------------
     def navigate(self):
         url = self.url_bar.text()
         if not url.startswith("http"):
@@ -113,14 +111,14 @@ class Browser(QMainWindow):
         if i != -1:
             self.tabs.setTabText(i, browser.page().title())
 
-    # ---------------- DOWNLOAD MANAGER ----------------
+  # ------------- Download Manager ---------------------
     def handle_download(self, download):
         path, _ = QFileDialog.getSaveFileName(self, "Save File", download.path())
         if path:
             download.setPath(path)
             download.accept()
 
-    # ---------------- BOOKMARKS ----------------
+    # ------------- Bookmarks ---------------------
     def add_bookmark(self):
         url = self.current().url().toString()
         title = self.current().page().title()
@@ -131,7 +129,7 @@ class Browser(QMainWindow):
     def show_bookmarks(self):
         self.show_list("Bookmarks", self.bookmarks)
 
-    # ---------------- HISTORY ----------------
+    # ------------- History ---------------------
     def save_history(self, url):
         self.history.append({"url": url, "time": QDateTime.currentDateTime().toString()})
         self.save_json(HISTORY_FILE, self.history)
@@ -139,7 +137,7 @@ class Browser(QMainWindow):
     def show_history(self):
         self.show_list("History", self.history)
 
-    # ---------------- LIST VIEWER ----------------
+   # ------------- List Viewer ---------------------
     def show_list(self, title, data):
         dlg = QDialog(self)
         dlg.setWindowTitle(title)
@@ -158,7 +156,7 @@ class Browser(QMainWindow):
         dlg.resize(400, 500)
         dlg.exec_()
 
-    # ---------------- AI SUMMARIZER (HOOK) ----------------
+    # ---------------- AI Summarizer ----------------
     def summarize_page(self):
         def handle_text(text):
             summary = (
@@ -170,7 +168,7 @@ class Browser(QMainWindow):
 
         self.current().page().toPlainText(handle_text)
 
-    # ---------------- UTIL ----------------
+    # ---------------- Utilities ----------------
     def load_json(self, file):
         try:
             with open(file, "r") as f:
@@ -183,8 +181,9 @@ class Browser(QMainWindow):
             json.dump(data, f, indent=4)
 
 
-# ---------------- RUN ----------------
+# ---------------- Application Execution ----------------
 app = QApplication(sys.argv)
 window = Browser()
 window.show()
 sys.exit(app.exec_())
+
