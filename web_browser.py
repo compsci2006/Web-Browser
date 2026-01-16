@@ -50,20 +50,20 @@ class Browser(QMainWindow):
         nav = QToolBar()
         self.addToolBar(nav)
 
-        nav.addAction("◀", lambda: self.current().back())
-        nav.addAction("▶", lambda: self.current().forward())
-        nav.addAction("⟳", lambda: self.current().reload())
-        nav.addAction("🏠", self.go_home)
+        nav.addAction("Back", lambda: self.current().back())
+        nav.addAction("Forward", lambda: self.current().forward())
+        nav.addAction("Reload", lambda: self.current().reload())
+        nav.addAction("Home", self.go_home)
 
         self.url_bar = QLineEdit()
         self.url_bar.returnPressed.connect(self.navigate)
         nav.addWidget(self.url_bar)
 
-        nav.addAction("⭐", self.add_bookmark)
-        nav.addAction("📜", self.show_history)
-        nav.addAction("📂", self.show_bookmarks)
-        nav.addAction("🕶️", self.new_incognito_tab)
-        nav.addAction("🧠", self.summarize_page)
+        nav.addAction("Bookmarks", self.add_bookmark)
+        nav.addAction("History", self.show_history)
+        nav.addAction("Show Bookmarks", self.show_bookmarks)
+        nav.addAction("Incognito", self.new_incognito_tab)
+        nav.addAction("Summarize", self.summarize_page)
 
   # ------------- Tabs ---------------------
     def add_new_tab(self, url, incognito=False):
