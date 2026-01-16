@@ -1,91 +1,190 @@
-# Import required PyQt5 modules for GUI components, core functionality,
-# and the web engine used to render web pages
-
-# The GUI import is not necessary for this. You don't have to have it
-# The web application still works without it 
+import sys
+import json
 
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *  
 from PyQt5.QtCore import *
-from PyQt5.QtWebEngineWidgets import *
+from PyQt5.QtGui import *
 
-"""
-    A simple web browser built using PyQt5.
-    Provides basic navigation features such as URL input,
-    back, forward, and page loading.
-    """
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, QWebEngineProfile
+from PyQt5.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 
-class MyWebBrowser():
+BOOKMARKS_FILE = "bookmarks.json"
+HISTORY_FILE = "history.json"
+HOME_URL = "https://www.google.com"
+
+AD_BLOCK_LIST = [
+    "ads", "doubleclick", "googlesyndication",
+    "tracking", "analytics"
+]
+
+
+# ---------------- AD BLOCKER ----------------
+class AdBlocker(QWebEngineUrlRequestInterceptor):
+    def interceptRequest(self, info):
+        url = info.requestUrl().toString().lower()
+        if any(ad in url for ad in AD_BLOCK_LIST):
+            info.block(True)
+
+
+# ---------------- BROWSER ----------------
+class Browser(QMainWindow):
     def __init__(self):
-        # Create the main application window
-        self.window = QWidget()
-        self.window.setWindowTitle("Google Web Browser")
+        super().__init__()
+        self.setWindowTitle("Python Web Browser")
+        self.setGeometry(100, 100, 1200, 800)
 
-        # Create vertical and horizontal layouts
-        self.layout = QVBoxLayout()     # Main layout
-        self.horizontal = QHBoxLayout() # Top navigation bar layout
+        self.bookmarks = self.load_json(BOOKMARKS_FILE)
+        self.history = self.load_json(HISTORY_FILE)
 
-        # URL input bar where the user types the website address
-        self.url_bar = QTextEdit()
-        self.url_bar.setMaximumHeight(30)
+        self.tabs = QTabWidget()
+        self.tabs.setTabsClosable(True)
+        self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.setCentralWidget(self.tabs)
 
-        # "Go" button to load the entered URL
-        self.go_btn = QPushButton("Go")
-        self.go_btn.setMinimumHeight(30)
+        self.profile = QWebEngineProfile.defaultProfile()
+        self.profile.setRequestInterceptor(AdBlocker())
 
-        # Back navigation button
-        self.back_btn = QPushButton("<")
-        self.back_btn.setMinimumHeight(30)
+        self.build_toolbar()
+        self.add_new_tab(QUrl(HOME_URL))
 
-        # Forward navigation button
-        self.forward_btn = QPushButton(">")
-        self.forward_btn.setMinimumHeight(30)
+    # ---------------- UI ----------------
+    def build_toolbar(self):
+        nav = QToolBar()
+        self.addToolBar(nav)
 
-        # Add widgets to the horizontal navigation bar
-        self.horizontal.addWidget(self.url_bar)
-        self.horizontal.addWidget(self.go_btn)
-        self.horizontal.addWidget(self.back_btn)
-        self.horizontal.addWidget(self.forward_btn)
+        nav.addAction("◀", lambda: self.current().back())
+        nav.addAction("▶", lambda: self.current().forward())
+        nav.addAction("⟳", lambda: self.current().reload())
+        nav.addAction("🏠", self.go_home)
 
-        # Web view widget used to display web pages
-        self.browser = QWebEngineView()
+        self.url_bar = QLineEdit()
+        self.url_bar.returnPressed.connect(self.navigate)
+        nav.addWidget(self.url_bar)
 
-        # Connect button clicks to their respective functions
-        self.go_btn.clicked.connect(
-            lambda: self.navigate(self.url_bar.toPlainText())
-        )
-        self.back_btn.clicked.connect(self.browser.back)
-        self.forward_btn.clicked.connect(self.browser.forward)
+        nav.addAction("⭐", self.add_bookmark)
+        nav.addAction("📜", self.show_history)
+        nav.addAction("📂", self.show_bookmarks)
+        nav.addAction("🕶️", self.new_incognito_tab)
+        nav.addAction("🧠", self.summarize_page)
 
-        # Add navigation bar and browser view to the main layout
-        self.layout.addLayout(self.horizontal)
-        self.layout.addWidget(self.browser)
+    # ---------------- TABS ----------------
+    def add_new_tab(self, url, incognito=False):
+        profile = QWebEngineProfile() if incognito else self.profile
+        page = QWebEnginePage(profile, self)
 
-        # Load Google as the default home page
-        self.browser.setUrl(QUrl("http://www.google.com"))
+        browser = QWebEngineView()
+        browser.setPage(page)
+        browser.setUrl(url)
 
-        # Apply layout to the window and display it
-        self.window.setLayout(self.layout)
-        self.window.show()
+        i = self.tabs.addTab(browser, "Private" if incognito else "New Tab")
+        self.tabs.setCurrentIndex(i)
 
-        """
-        Navigates to the given URL.
-        Automatically adds 'http://' if missing.
-        """
+        browser.urlChanged.connect(lambda qurl: self.update_url(qurl, browser))
+        browser.loadFinished.connect(lambda: self.update_title(browser))
+        browser.page().profile().downloadRequested.connect(self.handle_download)
 
-    def navigate(self, url):
+    def new_incognito_tab(self):
+        self.add_new_tab(QUrl(HOME_URL), incognito=True)
+
+    def close_tab(self, i):
+        if self.tabs.count() > 1:
+            self.tabs.removeTab(i)
+
+    def current(self):
+        return self.tabs.currentWidget()
+
+    # ---------------- NAVIGATION ----------------
+    def navigate(self):
+        url = self.url_bar.text()
         if not url.startswith("http"):
             url = "http://" + url
-            self.url_bar.setText(url)
+        self.current().setUrl(QUrl(url))
 
-        # Load the requested URL in the browser
-        self.browser.setUrl(QUrl(url))
+    def go_home(self):
+        self.current().setUrl(QUrl(HOME_URL))
 
-# Create the application instance
-app = QApplication([])
+    def update_url(self, qurl, browser):
+        if browser == self.current():
+            self.url_bar.setText(qurl.toString())
+            self.save_history(qurl.toString())
 
-# Create and display the browser window
-window = MyWebBrowser()
+    def update_title(self, browser):
+        i = self.tabs.indexOf(browser)
+        if i != -1:
+            self.tabs.setTabText(i, browser.page().title())
 
-# Start the application event loop
-app.exec_()
+    # ---------------- DOWNLOAD MANAGER ----------------
+    def handle_download(self, download):
+        path, _ = QFileDialog.getSaveFileName(self, "Save File", download.path())
+        if path:
+            download.setPath(path)
+            download.accept()
+
+    # ---------------- BOOKMARKS ----------------
+    def add_bookmark(self):
+        url = self.current().url().toString()
+        title = self.current().page().title()
+        self.bookmarks.append({"title": title, "url": url})
+        self.save_json(BOOKMARKS_FILE, self.bookmarks)
+        QMessageBox.information(self, "Saved", "Bookmark added")
+
+    def show_bookmarks(self):
+        self.show_list("Bookmarks", self.bookmarks)
+
+    # ---------------- HISTORY ----------------
+    def save_history(self, url):
+        self.history.append({"url": url, "time": QDateTime.currentDateTime().toString()})
+        self.save_json(HISTORY_FILE, self.history)
+
+    def show_history(self):
+        self.show_list("History", self.history)
+
+    # ---------------- LIST VIEWER ----------------
+    def show_list(self, title, data):
+        dlg = QDialog(self)
+        dlg.setWindowTitle(title)
+        layout = QVBoxLayout()
+
+        list_widget = QListWidget()
+        for item in data:
+            list_widget.addItem(item["url"])
+
+        list_widget.itemClicked.connect(
+            lambda item: self.current().setUrl(QUrl(item.text()))
+        )
+
+        layout.addWidget(list_widget)
+        dlg.setLayout(layout)
+        dlg.resize(400, 500)
+        dlg.exec_()
+
+    # ---------------- AI SUMMARIZER (HOOK) ----------------
+    def summarize_page(self):
+        def handle_text(text):
+            summary = (
+                "AI Summarizer Placeholder\n\n"
+                "This is where an LLM API would summarize:\n\n"
+                + text[:800] + "..."
+            )
+            QMessageBox.information(self, "Page Summary", summary)
+
+        self.current().page().toPlainText(handle_text)
+
+    # ---------------- UTIL ----------------
+    def load_json(self, file):
+        try:
+            with open(file, "r") as f:
+                return json.load(f)
+        except:
+            return []
+
+    def save_json(self, file, data):
+        with open(file, "w") as f:
+            json.dump(data, f, indent=4)
+
+
+# ---------------- RUN ----------------
+app = QApplication(sys.argv)
+window = Browser()
+window.show()
+sys.exit(app.exec_())
