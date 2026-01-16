@@ -12,10 +12,7 @@ BOOKMARKS_FILE = "bookmarks.json"
 HISTORY_FILE = "history.json"
 HOME_URL = "https://www.google.com"
 
-AD_BLOCK_LIST = [
-    "ads", "doubleclick", "googlesyndication",
-    "tracking", "analytics"
-]
+AD_BLOCK_LIST = ["ads","doubleclick","googlesyndication","tracking","analytics"]
 
 # ------------- Ad Blocker ---------------------
 class AdBlocker(QWebEngineUrlRequestInterceptor):
